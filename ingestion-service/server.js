@@ -125,6 +125,12 @@ client.on("error", (error) => {
   console.error("MQTT connection error:", error.message);
 });
 
+app.get("/", (req, res) => {
+  res.json({
+    message: "IoT Telemetry Platform API is running",
+  });
+});
+
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
@@ -148,6 +154,126 @@ app.get("/telemetry/count", async (req, res) => {
     console.error("Failed to fetch telemetry count:", error.message);
     res.status(500).json({
       error: "Failed to fetch telemetry count",
+      details: error.message,
+    });
+  }
+});
+
+app.get("/devices", async (req, res) => {
+  try {
+    const query = `
+    SELECT
+      device_id,
+      MAX(timestamp) AS last_seen,
+      COUNT(*) AS telemetry_count
+    FROM telemetry
+    GROUP BY device_id
+    ORDER BY device_id;
+    `;
+
+    const result = await dbPool.query(query);
+
+    res.json(
+      result.rows.map((row) => ({
+        device_id: row.device_id,
+        last_seen: row.last_seen,
+        telemetry_count: Number(row.telemetry_count),
+      })),
+    );
+  } catch (error) {
+    console.error("Failed to fetch devices:", error.message);
+    res.status(500).json({
+      error: "Failed to fetch devices",
+      details: error.message,
+    });
+  }
+});
+
+app.get("/devices/:id/telemetry", async (req, res) => {
+  const deviceId = req.params.id;
+  const limit = Number(req.query.limit) || 20;
+
+  try {
+    const query = `
+      SELECT
+        id,
+        device_id,
+        temperature,
+        humidity,
+        battery,
+        motion,
+        timestamp
+      FROM telemetry
+      WHERE device_id = $1
+      ORDER BY timestamp DESC
+      LIMIT $2;
+    `;
+
+    const result = await dbPool.query(query, [deviceId, limit]);
+
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({
+      error: "Failed to fetch device telemetry",
+      details: error.message,
+    });
+  }
+});
+
+app.get("/stats", async (req, res) => {
+  try {
+    const totalTelemetryQuery = `
+      SELECT COUNT(*) AS total_messages
+      FROM telemetry;
+    `;
+
+    const totalDevicesQuery = `
+      SELECT COUNT(DISTINCT device_id) AS total_devices
+      FROM telemetry;
+    `;
+
+    const avgTemperatureQuery = `
+      SELECT ROUND(AVG(temperature)::numeric, 2) AS avg_temperature
+      FROM telemetry;
+    `;
+
+    const avgBatteryQuery = `
+      SELECT ROUND(AVG(battery)::numeric, 2) AS avg_battery
+      FROM telemetry;
+    `;
+
+    const motionEventsQuery = `
+      SELECT COUNT(*) AS motion_events
+      FROM telemetry
+      WHERE motion = true;
+    `;
+
+    const [
+      totalTelemetry,
+      totalDevices,
+      avgTemperature,
+      avgBattery,
+      motionEvents,
+    ] = await Promise.all([
+      dbPool.query(totalTelemetryQuery),
+      dbPool.query(totalDevicesQuery),
+      dbPool.query(avgTemperatureQuery),
+      dbPool.query(avgBatteryQuery),
+      dbPool.query(motionEventsQuery),
+    ]);
+
+    res.json({
+      total_messages: Number(totalTelemetry.rows[0].total_messages),
+      total_devices: Number(totalDevices.rows[0].total_devices),
+      avg_temperature: Number(avgTemperature.rows[0].avg_temperature || 0),
+      avg_battery: Number(avgBattery.rows[0].avg_battery || 0),
+      motion_events: Number(motionEvents.rows[0].motion_events),
+      messagesReceived,
+      messagesStored,
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "Failed to fetch stats",
       details: error.message,
     });
   }

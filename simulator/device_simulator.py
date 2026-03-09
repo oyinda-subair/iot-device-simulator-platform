@@ -68,7 +68,7 @@ def main():
     devices and publishes it to an MQTT topic at regular intervals.
     """
     try:
-        client = mqtt.Client(callback_api_version=CallbackAPIVersion.VERSION1)
+        client = mqtt.Client(callback_api_version=CallbackAPIVersion.VERSION2)
     except TypeError:
         client = mqtt.Client()
     client.connect(MQTT_BROKER, MQTT_PORT, 60)
