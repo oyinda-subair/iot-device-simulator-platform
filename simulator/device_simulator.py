@@ -90,17 +90,23 @@ def main():
     print(f"Starting simulator with {number_of_devices} devices.")
     print(f"Publishing every {publish_interval} seconds...")
 
-    while True:
-        for device in devices:
-            telemetry = device.generate_telemetry()
-            payload = json.dumps(telemetry)
+    try:
+        while True:
+            for device in devices:
+                telemetry = device.generate_telemetry()
+                payload = json.dumps(telemetry)
 
-            client.publish(MQTT_TOPIC, payload)
+                client.publish(MQTT_TOPIC, payload)
 
-        print(
-            f"Published telemetry for {number_of_devices} devices at {datetime.now().isoformat(timespec='seconds')}")
-        time.sleep(publish_interval)
+            print(
+                f"Published telemetry for {number_of_devices} devices at {datetime.now().isoformat(timespec='seconds')}")
+            time.sleep(publish_interval)
+    except KeyboardInterrupt:
+        print("\n... Stopping simulator ...")
+        print("\nSimulation stopped by user. Exiting gracefully...")
 
+
+print('Program ends')
 
 if __name__ == "__main__":
     main()
