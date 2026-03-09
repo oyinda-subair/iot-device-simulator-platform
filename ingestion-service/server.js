@@ -20,6 +20,7 @@ const dbPool = new Pool({
 let messagesReceived = 0;
 let messagesStored = 0;
 let lastTelemetry = null;
+let startTime = Date.now();
 
 function isValidTelemetry(data) {
   return (
@@ -109,13 +110,9 @@ client.on("message", async (topic, message) => {
 
     await storeTelemetry(payload);
 
-    console.log(
-      `[${payload.timestamp}] ${payload.device_id} | ` +
-        `temp=${payload.temperature}C | ` +
-        `humidity=${payload.humidity}% | ` +
-        `battery=${payload.battery}% | ` +
-        `motion=${payload.motion}`,
-    );
+    if (messagesStored % 100 === 0) {
+      console.log(`Stored ${messagesStored} telemetry messages so far.`);
+    }
   } catch (error) {
     console.error("Error parsing message:", error.message);
   }
@@ -277,6 +274,19 @@ app.get("/stats", async (req, res) => {
       details: error.message,
     });
   }
+});
+
+app.get("/metrics", (req, res) => {
+  const uptimeSeconds = (Date.now() - startTime) / 1000;
+  const messagesPerSecond =
+    uptimeSeconds > 0 ? (messagesStored / uptimeSeconds).toFixed(2) : 0;
+
+  res.json({
+    uptime_seconds: Number(uptimeSeconds.toFixed(2)),
+    messages_received: messagesReceived,
+    messages_stored: messagesStored,
+    messages_per_second: Number(messagesPerSecond),
+  });
 });
 
 async function startServer() {

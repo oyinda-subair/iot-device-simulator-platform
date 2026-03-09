@@ -15,3 +15,23 @@ The system demonstrates:
 ## Architecture
 
 Device Simulator → MQTT Broker → Ingestion Service → Database → Dashboard
+
+## Load Testing
+
+The platform was load-tested with progressively increasing device counts to evaluate ingestion throughout and identify bottlenecks in logging and per message database writes.
+
+```bash
+DEVICE_COUNT=50 PUBLISH_INTERVAL=5 python3 device_simulator.py
+```
+
+```bash
+DEVICE_COUNT=100 PUBLISH_INTERVAL=3 python3 device_simulator.py
+```
+
+```bash
+DEVICE_COUNT=500 PUBLISH_INTERVAL=2 python3 device_simulator.py
+```
+
+```bash
+DEVICE_COUNT=1000 PUBLISH_INTERVAL=1 python3 device_simulator.py
+```

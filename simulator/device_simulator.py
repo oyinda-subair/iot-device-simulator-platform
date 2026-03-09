@@ -1,4 +1,13 @@
+"""
+Device Simulator Script
+This script simulates multiple IoT devices generating telemetry data such as
+temperature, humidity, battery level, and motion detection. The generated
+telemetry is published to an MQTT broker at regular intervals. Each device's
+data is structured in a JSON format, including a timestamp for when the data was
+generated. The script uses the paho-mqtt library to handle MQTT communication.
+"""
 import json
+import os
 import random
 import time
 from datetime import datetime
@@ -73,8 +82,13 @@ def main():
         client = mqtt.Client()
     client.connect(MQTT_BROKER, MQTT_PORT, 60)
 
-    number_of_devices = 10
+    number_of_devices = int(os.getenv("DEVICE_COUNT", "10"))
+    publish_interval = float(os.getenv("PUBLISH_INTERVAL", "5"))
+
     devices = create_devices(number_of_devices)
+
+    print(f"Starting simulator with {number_of_devices} devices.")
+    print(f"Publishing every {publish_interval} seconds...")
 
     while True:
         for device in devices:
@@ -82,10 +96,10 @@ def main():
             payload = json.dumps(telemetry)
 
             client.publish(MQTT_TOPIC, payload)
-            print(f"Published to {MQTT_TOPIC}: {payload}")
 
-        print("-" * 80)
-        time.sleep(5)
+        print(
+            f"Published telemetry for {number_of_devices} devices at {datetime.now().isoformat(timespec='seconds')}")
+        time.sleep(publish_interval)
 
 
 if __name__ == "__main__":
