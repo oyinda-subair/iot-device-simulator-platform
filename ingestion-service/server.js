@@ -1,5 +1,6 @@
 const mqtt = require("mqtt");
 const express = require("express");
+const cors = require("cors");
 const { Pool } = require("pg");
 
 const MQTT_BROKER_URL = "mqtt://localhost:1883";
@@ -7,6 +8,7 @@ const MQTT_TOPIC = "devices/telemetry";
 const PORT = 3000;
 
 const app = express();
+app.use(cors());
 const client = mqtt.connect(MQTT_BROKER_URL);
 
 const dbPool = new Pool({
