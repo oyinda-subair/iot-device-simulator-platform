@@ -1,0 +1,61 @@
+services:
+mqtt:
+image: eclipse-mosquitto:2
+container_name: mqtt-broker
+ports: - "1883:1883"
+volumes: - ./mosquitto/config:/mosquitto/config
+networks: - iot-network
+
+postgres:
+image: postgres:15
+container_name: postgres-iot
+environment:
+POSTGRES_USER: iot_user
+POSTGRES_PASSWORD: iot_password
+POSTGRES_DB: iot_platform
+ports: - "5432:5432"
+volumes: - postgres_data:/var/lib/postgresql/data
+networks: - iot-network
+
+ingestion-service:
+build: ./ingestion-service
+container_name: ingestion-service
+depends_on: - mqtt - postgres
+environment:
+PORT: 3000
+MQTT_BROKER_URL: mqtt://mqtt:1883
+MQTT_TOPIC: devices/telemetry
+DB_HOST: postgres
+DB_PORT: 5432
+DB_USER: iot_user
+DB_PASSWORD: iot_password
+DB_NAME: iot_platform
+ports: - "3000:3000"
+networks: - iot-network
+
+dashboard:
+build: ./dashboard
+container_name: dashboard
+depends_on: - ingestion-service
+ports: - "8080:80"
+networks: - iot-network
+
+simulator:
+build: ./simulator
+container_name: device-simulator
+depends_on: - mqtt
+environment:
+MQTT_BROKER: mqtt
+MQTT_PORT: 1883
+MQTT_TOPIC: devices/telemetry
+DEVICE_COUNT: 10
+PUBLISH_INTERVAL: 5
+restart: on-failure
+networks: - iot-network
+
+volumes:
+postgres_data:
+
+networks:
+iot-network:
+driver: bridge

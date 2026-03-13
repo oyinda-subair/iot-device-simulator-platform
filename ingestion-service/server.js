@@ -5,9 +5,9 @@ const http = require("http");
 const WebSocket = require("ws");
 const { Pool } = require("pg");
 
-const MQTT_BROKER_URL = "mqtt://localhost:1883";
-const MQTT_TOPIC = "devices/telemetry";
-const PORT = 3000;
+const MQTT_BROKER_URL = process.env.MQTT_BROKER_URL || "mqtt://localhost:1883";
+const MQTT_TOPIC = process.env.MQTT_TOPIC || "devices/telemetry";
+const PORT = Number(process.env.PORT || 3000);
 
 const app = express();
 app.use(cors());
@@ -18,11 +18,11 @@ const wss = new WebSocket.Server({ server });
 const client = mqtt.connect(MQTT_BROKER_URL);
 
 const dbPool = new Pool({
-  host: "localhost",
-  port: 5432,
-  user: "iot_user",
-  password: "iot_password",
-  database: "iot_platform",
+  host: process.env.DB_HOST || "localhost",
+  port: Number(process.env.DB_PORT || 5432),
+  user: process.env.DB_USER || "iot_user",
+  password: process.env.DB_PASSWORD || "iot_password",
+  database: process.env.DB_NAME || "iot_platform",
 });
 
 let messagesReceived = 0;
@@ -84,6 +84,21 @@ function broadcastWebSocketMessage(payload) {
       wsClient.send(message);
     }
   });
+}
+
+async function waitForDatabase(retries = 10, delayMs = 3000) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await dbPool.query("SELECT 1");
+      console.log("Database connection established.");
+      return;
+    } catch (error) {
+      console.log(`Database not ready yet (attempt ${attempt}/${retries})`);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  throw new Error("Database did not become ready in time.");
 }
 
 async function initializeDatabase() {
@@ -367,6 +382,8 @@ app.get("/metrics", (req, res) => {
 });
 
 async function startServer() {
+  // uncomment the following line if you want to wait for the database to be ready before starting the server
+  // await waitForDatabase();
   await initializeDatabase();
 
   server.listen(PORT, () => {
