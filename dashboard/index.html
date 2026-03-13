@@ -1,34 +1,55 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>IoT Telemetry Dashboard</title>
-  <link rel="stylesheet" href="styles.css" />
-</head>
-<body>
-  <div class="container">
-    <header>
-      <h1>IoT Telemetry Dashboard</h1>
-      <p>Monitor simulated devices and platform metrics</p>
-    </header>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IoT Telemetry Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>IoT Telemetry Dashboard</h1>
+        <p>Monitor simulated devices and platform metrics</p>
+      </header>
 
-    <section class="stats-section">
-      <h2>Platform Stats</h2>
-      <div id="stats" class="stats-grid">
-        <div class="card">Loading stats...</div>
-      </div>
-    </section>
+      <section class="stats-section">
+        <h2>Platform Stats</h2>
+        <div id="stats" class="stats-grid">
+          <div class="card">Loading stats...</div>
+        </div>
+      </section>
 
-    <section class="devices-section">
-      <h2>Devices</h2>
-      <button id="refresh-btn">Refresh Devices</button>
-      <div id="devices" class="devices-grid">
-        <div class="card">Loading devices...</div>
-      </div>
-    </section>
-  </div>
+      <section class="devices-section">
+        <h2>Devices</h2>
+        <button id="refresh-btn">Refresh Devices</button>
+        <div id="devices" class="devices-grid">
+          <div class="card">Loading devices...</div>
+        </div>
+      </section>
+      <section class="charts-section">
+        <h2>Device Telemetry Charts</h2>
+        <p id="selected-device-label">Showing telemetry for: device_001</p>
 
-  <script src="app.js"></script>
-</body>
+        <div class="charts-grid">
+          <div class="card chart-card">
+            <h3>Temperature Trend</h3>
+            <canvas id="temperatureChart"></canvas>
+          </div>
+
+          <div class="card chart-card">
+            <h3>Battery Trend</h3>
+            <canvas id="batteryChart"></canvas>
+          </div>
+          <div class="card chart-card">
+            <h3>Humidity Trend</h3>
+            <canvas id="humidityChart"></canvas>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="app.js"></script>
+  </body>
 </html>

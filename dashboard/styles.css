@@ -59,3 +59,44 @@ button {
 button:hover {
   opacity: 0.9;
 }
+
+.charts-section {
+  margin-top: 32px;
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.chart-card {
+  min-height: 320px;
+}
+
+canvas {
+  width: 100% !important;
+  height: 260px !important;
+}
+
+@media (max-width: 768px) {
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.device-card {
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.device-card:hover {
+  transform: translateY(-2px);
+}
+
+.device-card.selected {
+  outline: 2px solid #222;
+}
