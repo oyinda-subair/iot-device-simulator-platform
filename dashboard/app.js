@@ -1,9 +1,13 @@
 const API_BASE_URL = "http://localhost:3000";
+const WS_URL = "ws://localhost:3000";
+
 let selectedDeviceId = "device_001";
 
 let temperatureChartInstance = null;
 let batteryChartInstance = null;
 let humidityChartInstance = null;
+
+let socket = null;
 
 function formatDate(value) {
   return new Date(value).toLocaleString();
@@ -196,6 +200,60 @@ function renderHumidityChart(labels, data) {
   });
 }
 
+function connectWebSocket() {
+  socket = new WebSocket(WS_URL);
+
+  socket.onopen = () => {
+    console.log("Connected to WebSocket server");
+    updateConnectionStatus("Live");
+  };
+
+  socket.onmessage = async (event) => {
+    try {
+      const message = JSON.parse(event.data);
+
+      if (message.type === "telemetry") {
+        const telemetry = message.data;
+
+        await fetchStats();
+        await fetchDevices();
+
+        if (telemetry.device_id === selectedDeviceId) {
+          await fetchDeviceTelemetry(selectedDeviceId);
+        }
+
+        updateLastLiveUpdate();
+      }
+    } catch (error) {
+      console.error("Error handling WebSocket message:", error);
+    }
+  };
+
+  socket.onclose = () => {
+    console.log("WebSocket disconnected. Reconnecting...");
+    updateConnectionStatus("Disconnected");
+    setTimeout(connectWebSocket, 3000);
+  };
+
+  socket.onerror = (error) => {
+    console.error("WebSocket error:", error);
+  };
+}
+
+function updateConnectionStatus(status) {
+  const el = document.getElementById("connection-status");
+  if (el) {
+    el.textContent = `Connection: ${status}`;
+  }
+}
+
+function updateLastLiveUpdate() {
+  const el = document.getElementById("last-live-update");
+  if (el) {
+    el.textContent = `Last live update: ${new Date().toLocaleTimeString()}`;
+  }
+}
+
 async function refreshDashboard() {
   await fetchStats();
   await fetchDevices();
@@ -209,8 +267,13 @@ document
   .getElementById("refresh-btn")
   .addEventListener("click", refreshDashboard);
 
+// Initial load
 refreshDashboard();
+connectWebSocket();
 
+// MQTT message handling and WebSocket broadcasting logic in ingestion-service/server.js
+/*
 setInterval(() => {
   refreshDashboard();
 }, 5000);
+*/

@@ -28,4 +28,4 @@
 
 - Devices: 1000
 - Publish interval: 1s
-- Result: Some lag / some bottleneck observed
+- Result: Some lag / some bottleneck observed / Unable to load dashboard

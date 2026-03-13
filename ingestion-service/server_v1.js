@@ -1,8 +1,6 @@
 const mqtt = require("mqtt");
 const express = require("express");
 const cors = require("cors");
-const http = require("http");
-const WebSocket = require("ws");
 const { Pool } = require("pg");
 
 const MQTT_BROKER_URL = "mqtt://localhost:1883";
@@ -11,10 +9,6 @@ const PORT = 3000;
 
 const app = express();
 app.use(cors());
-
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
-
 const client = mqtt.connect(MQTT_BROKER_URL);
 
 const dbPool = new Pool({
@@ -41,17 +35,10 @@ function isValidTelemetry(data) {
   );
 }
 
-function broadcastWebSocketMessage(payload) {
-  const message = JSON.stringify(payload);
-
-  wss.clients.forEach((wsClient) => {
-    if (wsClient.readyState === WebSocket.OPEN) {
-      wsClient.send(message);
-    }
-  });
-}
-
 async function initializeDatabase() {
+  // TODO: Add created_at for cleaner queries and data management
+  // created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS telemetry (
       id SERIAL PRIMARY KEY,
@@ -125,36 +112,16 @@ client.on("message", async (topic, message) => {
 
     await storeTelemetry(payload);
 
-    if (messagesStored % 50 === 0) {
-      console.log(`Stored ${messagesStored} telemetry messages so far`);
+    if (messagesStored % 100 === 0) {
+      console.log(`Stored ${messagesStored} telemetry messages so far.`);
     }
-
-    broadcastWebSocketMessage({
-      type: "telemetry",
-      data: payload,
-    });
   } catch (error) {
-    console.error("Error processing message:", error.message);
+    console.error("Error parsing message:", error.message);
   }
 });
 
 client.on("error", (error) => {
   console.error("MQTT connection error:", error.message);
-});
-
-wss.on("connection", (wsClient) => {
-  console.log("WebSocket client connected");
-
-  wsClient.send(
-    JSON.stringify({
-      type: "connection",
-      data: { message: "Connected to IoT telemetry stream" },
-    }),
-  );
-
-  wsClient.on("close", () => {
-    console.log("WebSocket client disconnected");
-  });
 });
 
 app.get("/", (req, res) => {
@@ -183,6 +150,7 @@ app.get("/telemetry/count", async (req, res) => {
       count: Number(result.rows[0].count),
     });
   } catch (error) {
+    console.error("Failed to fetch telemetry count:", error.message);
     res.status(500).json({
       error: "Failed to fetch telemetry count",
       details: error.message,
@@ -193,13 +161,13 @@ app.get("/telemetry/count", async (req, res) => {
 app.get("/devices", async (req, res) => {
   try {
     const query = `
-      SELECT
-        device_id,
-        MAX(timestamp) AS last_seen,
-        COUNT(*) AS telemetry_count
-      FROM telemetry
-      GROUP BY device_id
-      ORDER BY device_id;
+    SELECT
+      device_id,
+      MAX(timestamp) AS last_seen,
+      COUNT(*) AS telemetry_count
+    FROM telemetry
+    GROUP BY device_id
+    ORDER BY device_id;
     `;
 
     const result = await dbPool.query(query);
@@ -212,6 +180,7 @@ app.get("/devices", async (req, res) => {
       })),
     );
   } catch (error) {
+    console.error("Failed to fetch devices:", error.message);
     res.status(500).json({
       error: "Failed to fetch devices",
       details: error.message,
@@ -221,8 +190,7 @@ app.get("/devices", async (req, res) => {
 
 app.get("/devices/:id/telemetry", async (req, res) => {
   const deviceId = req.params.id;
-  const parsedLimit = parseInt(req.query.limit, 10);
-  const limit = Number.isNaN(parsedLimit) ? 20 : parsedLimit;
+  const limit = Number(req.query.limit) || 20;
 
   try {
     const query = `
@@ -241,6 +209,7 @@ app.get("/devices/:id/telemetry", async (req, res) => {
     `;
 
     const result = await dbPool.query(query, [deviceId, limit]);
+
     res.json(result.rows);
   } catch (error) {
     res.status(500).json({
@@ -325,10 +294,8 @@ app.get("/metrics", (req, res) => {
 async function startServer() {
   await initializeDatabase();
 
-  server.listen(PORT, () => {
-    console.log(
-      `HTTP and WebSocket server running at http://localhost:${PORT}`,
-    );
+  app.listen(PORT, () => {
+    console.log(`HTTP server running at http://localhost:${PORT}`);
   });
 }
 
