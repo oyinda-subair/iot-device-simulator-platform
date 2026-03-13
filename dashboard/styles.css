@@ -105,3 +105,37 @@ canvas {
   font-weight: bold;
   color: #444;
 }
+
+.alerts-section {
+  margin-top: 32px;
+}
+
+.alerts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.alert-card {
+  background: #fff4f4;
+  border-left: 5px solid #ff4d4d;
+  padding: 12px;
+  border-radius: 6px;
+}
+
+.alert-card strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.alert-card[data-type="LOW_BATTERY"] {
+  border-color: orange;
+}
+
+.alert-card[data-type="HIGH_TEMPERATURE"] {
+  border-color: red;
+}
+
+.alert-card[data-type="MOTION_DETECTED"] {
+  border-color: blue;
+}

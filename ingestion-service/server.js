@@ -41,6 +41,41 @@ function isValidTelemetry(data) {
   );
 }
 
+function evaluateAlerts(payload) {
+  const alerts = [];
+
+  if (payload.battery < 20) {
+    alerts.push({
+      type: "LOW_BATTERY",
+      device_id: payload.device_id,
+      value: payload.battery,
+      message: `Battery low (${payload.battery}%)`,
+      timestamp: payload.timestamp,
+    });
+  }
+
+  if (payload.temperature > 35) {
+    alerts.push({
+      type: "HIGH_TEMPERATURE",
+      device_id: payload.device_id,
+      value: payload.temperature,
+      message: `High temperature (${payload.temperature}°C)`,
+      timestamp: payload.timestamp,
+    });
+  }
+
+  if (payload.motion === true) {
+    alerts.push({
+      type: "MOTION_DETECTED",
+      device_id: payload.device_id,
+      message: `Motion detected`,
+      timestamp: payload.timestamp,
+    });
+  }
+
+  return alerts;
+}
+
 function broadcastWebSocketMessage(payload) {
   const message = JSON.stringify(payload);
 
@@ -124,6 +159,15 @@ client.on("message", async (topic, message) => {
     lastTelemetry = payload;
 
     await storeTelemetry(payload);
+
+    const alerts = evaluateAlerts(payload);
+
+    alerts.forEach((alert) => {
+      broadcastWebSocketMessage({
+        type: "alert",
+        data: alert,
+      });
+    });
 
     if (messagesStored % 50 === 0) {
       console.log(`Stored ${messagesStored} telemetry messages so far`);

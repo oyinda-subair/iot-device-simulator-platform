@@ -224,6 +224,10 @@ function connectWebSocket() {
 
         updateLastLiveUpdate();
       }
+
+      if (message.type === "alert") {
+        renderAlert(message.data);
+      }
     } catch (error) {
       console.error("Error handling WebSocket message:", error);
     }
@@ -251,6 +255,27 @@ function updateLastLiveUpdate() {
   const el = document.getElementById("last-live-update");
   if (el) {
     el.textContent = `Last live update: ${new Date().toLocaleTimeString()}`;
+  }
+}
+
+function renderAlert(alert) {
+  const alertsContainer = document.getElementById("alerts");
+
+  const alertElement = document.createElement("div");
+  alertElement.className = "alert-card";
+  alertElement.setAttribute("data-type", alert.type);
+
+  alertElement.innerHTML = `
+    <strong>${alert.type}</strong>
+    Device: ${alert.device_id}<br/>
+    ${alert.message}<br/>
+    Time: ${new Date(alert.timestamp).toLocaleTimeString()}
+  `;
+
+  alertsContainer.prepend(alertElement);
+
+  if (alertsContainer.children.length > 20) {
+    alertsContainer.removeChild(alertsContainer.lastChild);
   }
 }
 
