@@ -243,3 +243,8 @@ coverage/
 .env.production.local
 
 .vscode/
+
+.DS_Store
+Thumbs.db
+*/.DS_Store
+*.swp

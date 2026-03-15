@@ -1,18 +1,44 @@
 # Architecture Overview
 
-Components:
+## Components:
 
-1. Device Simulator
-   Simulates thousands of IoT devices sending telemetry data.
+### 1. Device Simulator
 
-2. MQTT Broker
-   Handles message communication between devices and backend.
+A Python-based simulator that generates telemetry for virtual IoT devices and publishes messages to MQTT.
 
-3. Ingestion Service
-   Receives telemetry and stores it in the database.
+### 2. MQTT Broker
 
-4. Database
-   Stores telemetry data.
+Mosquitto acts as the message broker between simulated devices and the backend ingestion service.
 
-5. Dashboard
-   Displays real-time device metrics.
+### 3. Ingestion Service
+
+A Node.js service that:
+
+- subscribes to MQTT telemetry
+- validates messages
+- stores telemetry in PostgreSQL
+- broadcasts live updates over WebSockets
+- evaluates alert rules
+
+### 4. PostgreSQL
+
+Stores telemetry history and device registry data.
+
+### 5. Dashboard
+
+A browser-based UI that displays:
+
+- system statistics
+- device cards
+- telemetry charts
+- live alerts
+- connection status
+
+## Data Flow
+
+1. Simulator publishes telemetry
+2. MQTT broker forwards telemetry
+3. Ingestion service validates and stores data
+4. Alerts are evaluated
+5. WebSocket broadcasts live updates
+6. Dashboard renders current system state
