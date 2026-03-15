@@ -11,6 +11,7 @@ const PORT = Number(process.env.PORT || 3000);
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
@@ -102,6 +103,17 @@ async function waitForDatabase(retries = 10, delayMs = 3000) {
 }
 
 async function initializeDatabase() {
+  const createDevicesTableQuery = `
+    CREATE TABLE IF NOT EXISTS devices (
+      id SERIAL PRIMARY KEY,
+      device_id VARCHAR(50) UNIQUE NOT NULL,
+      name VARCHAR(100),
+      status VARCHAR(20) NOT NULL DEFAULT 'active',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `;
+
   const createTableQuery = `
     CREATE TABLE IF NOT EXISTS telemetry (
       id SERIAL PRIMARY KEY,
@@ -115,8 +127,9 @@ async function initializeDatabase() {
   `;
 
   try {
+    await dbPool.query(createDevicesTableQuery);
     await dbPool.query(createTableQuery);
-    console.log("Telemetry table is ready.");
+    console.log("Device and Telemetry tables are ready.");
   } catch (error) {
     console.error("Failed to initialize database:", error.message);
     process.exit(1);
@@ -149,6 +162,17 @@ async function storeTelemetry(payload) {
   messagesStored += 1;
 }
 
+async function upsertDevice(deviceId) {
+  const query = `
+    INSERT INTO devices (device_id, status, updated_at)
+    VALUES ($1, 'active', CURRENT_TIMESTAMP)
+    ON CONFLICT (device_id)
+    DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+  `;
+
+  await dbPool.query(query, [deviceId]);
+}
+
 client.on("connect", () => {
   console.log(`Connected to MQTT broker at ${MQTT_BROKER_URL}`);
 
@@ -173,6 +197,7 @@ client.on("message", async (topic, message) => {
     messagesReceived += 1;
     lastTelemetry = payload;
 
+    await upsertDevice(payload.device_id);
     await storeTelemetry(payload);
 
     const alerts = evaluateAlerts(payload);
@@ -253,12 +278,17 @@ app.get("/devices", async (req, res) => {
   try {
     const query = `
       SELECT
-        device_id,
-        MAX(timestamp) AS last_seen,
-        COUNT(*) AS telemetry_count
-      FROM telemetry
-      GROUP BY device_id
-      ORDER BY device_id;
+        d.device_id,
+        d.name,
+        d.status,
+        d.created_at,
+        d.updated_at,
+        MAX(t.timestamp) AS last_seen,
+        COUNT(t.id) AS telemetry_count
+      FROM devices d
+      LEFT JOIN telemetry t ON d.device_id = t.device_id
+      GROUP BY d.device_id, d.name, d.status, d.created_at, d.updated_at
+      ORDER BY d.device_id;
     `;
 
     const result = await dbPool.query(query);
@@ -266,6 +296,10 @@ app.get("/devices", async (req, res) => {
     res.json(
       result.rows.map((row) => ({
         device_id: row.device_id,
+        name: row.name,
+        status: row.status,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
         last_seen: row.last_seen,
         telemetry_count: Number(row.telemetry_count),
       })),
@@ -379,6 +413,143 @@ app.get("/metrics", (req, res) => {
     messages_stored: messagesStored,
     messages_per_second: Number(messagesPerSecond),
   });
+});
+
+// -----------------------------
+// Post endpoints
+// -----------------------------
+
+// Register or update a device (idempotent)
+app.post("/devices", async (req, res) => {
+  const { device_id, name } = req.body;
+
+  if (!device_id || typeof device_id !== "string") {
+    return res.status(400).json({
+      error: "device_id is required and must be a string",
+    });
+  }
+
+  try {
+    const query = `
+      INSERT INTO devices (device_id, name, status)
+      VALUES ($1, $2, 'active')
+      ON CONFLICT (device_id)
+      DO UPDATE SET
+        name = COALESCE(EXCLUDED.name, devices.name),
+        updated_at = CURRENT_TIMESTAMP
+      RETURNING *;
+    `;
+
+    const result = await dbPool.query(query, [device_id, name || null]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({
+      error: "Failed to register device",
+      details: error.message,
+    });
+  }
+});
+
+// -----------------------------
+// Update  endpoints
+// -----------------------------
+
+// Disable a device (soft delete)
+app.patch("/devices/:id/disable", async (req, res) => {
+  const deviceId = req.params.id;
+
+  try {
+    const query = `
+      UPDATE devices
+      SET status = 'disabled',
+          updated_at = CURRENT_TIMESTAMP
+      WHERE device_id = $1
+      RETURNING *;
+    `;
+
+    const result = await dbPool.query(query, [deviceId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        error: "Device not found",
+      });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({
+      error: "Failed to disable device",
+      details: error.message,
+    });
+  }
+});
+
+// Enable a device
+app.patch("/devices/:id/enable", async (req, res) => {
+  const deviceId = req.params.id;
+
+  try {
+    const query = `
+      UPDATE devices
+      SET status = 'active',
+          updated_at = CURRENT_TIMESTAMP
+      WHERE device_id = $1
+      RETURNING *;
+    `;
+
+    const result = await dbPool.query(query, [deviceId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        error: "Device not found",
+      });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({
+      error: "Failed to enable device",
+      details: error.message,
+    });
+  }
+});
+
+// Update device name
+app.patch("/devices/:id", async (req, res) => {
+  const deviceId = req.params.id;
+  const { name } = req.body;
+
+  if (typeof name !== "string" || !name.trim()) {
+    return res.status(400).json({
+      error: "name must be a non-empty string",
+    });
+  }
+
+  try {
+    const query = `
+      UPDATE devices
+      SET name = $2,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE device_id = $1
+      RETURNING *;
+    `;
+
+    const result = await dbPool.query(query, [deviceId, name.trim()]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        error: "Device not found",
+      });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({
+      error: "Failed to update device",
+      details: error.message,
+    });
+  }
 });
 
 async function startServer() {

@@ -139,3 +139,13 @@ canvas {
 .alert-card[data-type="MOTION_DETECTED"] {
   border-color: blue;
 }
+
+.status-active {
+  color: green;
+  font-weight: bold;
+}
+
+.status-disabled {
+  color: crimson;
+  font-weight: bold;
+}

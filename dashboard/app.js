@@ -74,7 +74,9 @@ async function fetchDevices() {
           <div class="card device-card ${device.device_id === selectedDeviceId ? "selected" : ""}"
                data-device-id="${device.device_id}">
             <h3>${device.device_id}</h3>
-            <p><strong>Last Seen:</strong> ${formatDate(device.last_seen)}</p>
+            <p><strong>Name:</strong> ${device.name || "Unnamed Device"}</p>
+            <p><strong>Status:</strong> <span class="status-${device.status}">${device.status}</span></p>
+            <p><strong>Last Seen:</strong> ${device.last_seen ? formatDate(device.last_seen) : "Never"}</p>
             <p><strong>Telemetry Count:</strong> ${device.telemetry_count}</p>
           </div>
         `,
